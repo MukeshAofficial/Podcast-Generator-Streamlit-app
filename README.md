@@ -30,7 +30,7 @@ This Streamlit application allows you to generate podcasts from various sources:
         Replace `"your_fal_key"`, `"your_openrouter_api_key"`, and `"your_google_api_key"` with your actual API keys.
         -   You can find your fal-client API key on the Fal.ai dashboard.
         -   For `OPENROUTER_API_KEY`, you need to register to openrouter.ai and generate one API key.
-        -   You will need a Google Cloud Project to generate the Gemini API Key.
+      
 
 3.  **Run the Streamlit application:**
     ```bash
