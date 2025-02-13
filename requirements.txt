@@ -8,5 +8,4 @@ langchain-community
 langchain_chroma
 pypdf
 python-docx
-pysqlite3
 chromadb
