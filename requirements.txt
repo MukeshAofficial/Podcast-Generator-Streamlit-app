@@ -6,3 +6,4 @@ langchain_openai
 fal_client
 langchain-community
 langchain_chroma
+pypdf
