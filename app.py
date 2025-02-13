@@ -4,11 +4,11 @@ import tempfile
 from langchain.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 import fal_client
-from dotenv import load_dotenv
+#from dotenv import load_dotenv  # No longer needed, removing import
 from langchain_community.document_loaders import WebBaseLoader
-from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
-from pypdf import PdfReader  
-from docx import Document 
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
+from docx import Document
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -17,8 +17,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
 
-
-load_dotenv()  # Load environment variables from .env file
+#load_dotenv()  # Load environment variables from .env file - REMOVED
 
 
 def extract_text_from_pdf(file_path):
@@ -53,8 +52,8 @@ def extract_text(file_path, file_type):
 
 
 # --- Function for Generating Podcast Transcript with RAG---
-def generate_podcast_transcript_with_rag(topic, text=None):
-     
+def generate_podcast_transcript_with_rag(topic, text, openrouter_api_key, google_api_key):  # Added API key parameters
+
     if text:
 
         # Split the document into chunks
@@ -63,14 +62,14 @@ def generate_podcast_transcript_with_rag(topic, text=None):
 
         # Create a vector store
         vectorstore = Chroma.from_texts(
-            texts=docs, embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+            texts=docs, embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key) # Use provided API key
         )
 
         # Create a retriever
         retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 10})
 
         # Initialize Gemini model (ensure API key is set)
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0, max_tokens=None, timeout=None)
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0, max_tokens=None, timeout=None, google_api_key=google_api_key) # Use provided API key
 
         # Define prompt template
         system_prompt = (
@@ -119,11 +118,11 @@ Remember: Create completely new dialogue about {topic} based on the given contex
         rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
         response = rag_chain.invoke({"input": topic, "topic": topic})
-        
+
         # Initialize Deepseek model
         deepseek_llm = ChatOpenAI(
             model="deepseek/deepseek-chat",
-            openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+            openai_api_key=openrouter_api_key,  # Use provided API key
             openai_api_base="https://openrouter.ai/api/v1"
         )
 
@@ -131,10 +130,10 @@ Remember: Create completely new dialogue about {topic} based on the given contex
         deepseek_prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", system_prompt),
-               
+
             ]
         )
-        
+
         deepseek_chain =  deepseek_prompt | deepseek_llm
 
         deepseek_response = deepseek_chain.invoke({"topic": topic, "context": response["answer"]})
@@ -171,12 +170,12 @@ Remember: Create completely new dialogue about {topic}, don't use the above exam
 
         llm = ChatOpenAI(
             model="deepseek/deepseek-chat",
-            openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+            openai_api_key=openrouter_api_key,  # Use provided API key
             openai_api_base="https://openrouter.ai/api/v1"
         )
-    
-    
-       
+
+
+
     chain = podcast_template | llm
     response = chain.invoke({"topic": topic})
     return response.content
@@ -184,7 +183,7 @@ Remember: Create completely new dialogue about {topic}, don't use the above exam
 
 
 # --- Function for Generating Podcast with Audio ---
-def generate_podcast(topic, text=None):
+def generate_podcast(topic, text, fal_key, openrouter_api_key, google_api_key): # Added fal_key, openrouter_api_key, google_api_key
     if text:
         st.write(f"\n🎙️ Generating podcast transcript about text provided:")
         st.write("-" * 50)
@@ -195,7 +194,7 @@ def generate_podcast(topic, text=None):
     # Get transcript first
     try:
         with st.spinner("Generating Transcript..."):
-            transcript_result = generate_podcast_transcript_with_rag(topic, text)
+            transcript_result = generate_podcast_transcript_with_rag(topic, text, openrouter_api_key, google_api_key) # Pass API Keys
     except Exception as e:
         st.error(f"Error generating transcript: {e}")
         return None
@@ -233,6 +232,8 @@ def generate_podcast(topic, text=None):
                 },
                 with_logs=True,
                 on_queue_update=on_queue_update,
+                fal_key=fal_key # Pass API key
+
             )
 
         st.write("\n✅ Audio generation complete!")
@@ -253,35 +254,35 @@ def generate_podcast(topic, text=None):
 
 # --- Streamlit App ---
 def main():
-    st.title("Podcast Generator")
+    st.title("🎙️ Podcast Generator")
+    st.write("❤️ Built by [Build Fast with AI](https://buildfastwithai.com/genai-course)")
 
-    # Get API Keys from environment variables
-    fal_key = os.getenv("FAL_KEY")
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    google_api_key = os.getenv("GOOGLE_API_KEY")
-
-
-    if not fal_key or not openrouter_key or not google_api_key:
-        st.error(
-            "Please set FAL_KEY, OPENROUTER_API_KEY and GOOGLE_API_KEY as environment variables or in .env file."
-        )
-        return
-
-    os.environ["FAL_KEY"] = fal_key
-    os.environ["OPENROUTER_API_KEY"] = openrouter_key
-    os.environ["GOOGLE_API_KEY"] = google_api_key
 
     # --- Sidebar for Navigation ---
     st.sidebar.title("Navigation")
+
+    # API Keys Input in Sidebar
+    fal_key = st.sidebar.text_input("Enter FAL_KEY:", type="password")
+    openrouter_key = st.sidebar.text_input("Enter OPENROUTER_API_KEY:", type="password")
+    google_api_key = st.sidebar.text_input("Enter GOOGLE_API_KEY:", type="password")
+
+
+    if not fal_key or not openrouter_key or not google_api_key:
+        st.warning(
+            "Please enter FAL_KEY, OPENROUTER_API_KEY and GOOGLE_API_KEY in the sidebar to proceed."
+        )
+        return
+
+
     page = st.sidebar.radio("Go to", ["Topic-Based Podcast", "URL-Based Podcast","Document-Based Podcast"])
-    
+
     if page == "Topic-Based Podcast":
         st.header("Generate Podcast from Topic")
         topic = st.text_input("Enter podcast topic:")
 
         if st.button("Generate Podcast"):
             if topic:
-                podcast_data = generate_podcast(topic)
+                podcast_data = generate_podcast(topic, None, fal_key, openrouter_key, google_api_key) # Pass API Keys
 
                 if podcast_data and podcast_data["audio_url"]:
                    st.audio(podcast_data["audio_url"], format="audio/mpeg")
@@ -300,7 +301,7 @@ def main():
                 data = loader.load()
                 text = data[0].page_content
                 with st.spinner('Scraping URL Content...'):
-                    podcast_data = generate_podcast(podcast_title, text)
+                    podcast_data = generate_podcast(podcast_title, text, fal_key, openrouter_key, google_api_key) # Pass API Keys
                 if podcast_data and podcast_data["audio_url"]:
                    st.audio(podcast_data["audio_url"], format="audio/mpeg")
 
@@ -321,18 +322,18 @@ def main():
                     temp_file_path = "temp_uploaded_file"
                     with open(temp_file_path, "wb") as f:
                         f.write(uploaded_file.getvalue())
-                    
+
 
                     # Determine file type and load accordingly
                     file_extension = uploaded_file.name.split('.')[-1].lower()
-                    
+
                     text = extract_text(temp_file_path, file_extension)
                     if text == "Unsupported file type":
                         st.error(f"Unsupported file type {file_extension}")
                         return
-                    
+
                     # Process the document with RAG for podcast
-                    podcast_data = generate_podcast(podcast_title, text)
+                    podcast_data = generate_podcast(podcast_title, text, fal_key, openrouter_key, google_api_key) # Pass API Keys
 
 
                     # Delete the temporary file
@@ -345,12 +346,12 @@ def main():
 
               except Exception as e:
                   st.error(f"Error loading document or generating podcast: {str(e)}")
-              
+
             else:
 
 
               st.warning("Please upload a document and enter a podcast title.")
-                
+
 
 if __name__ == "__main__":
     main()
