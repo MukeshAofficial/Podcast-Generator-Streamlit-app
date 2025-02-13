@@ -12,9 +12,6 @@ import fal_client
 import requests
 import os
 import tempfile
-from langchain_community.embeddings import OpenAIEmbeddings
-import shutil  # Import shutil for deleting directories
-
 
 
 # Initialize LLM with API Keys directly
@@ -27,7 +24,7 @@ def initialize_llm(openrouter_api_key):
 
 
 # Function to load and process documents
-def load_and_process_docs(uploaded_file, website_url, openrouter_api_key):
+def load_and_process_docs(uploaded_file, website_url):
     all_docs = []
 
     if uploaded_file:
@@ -57,29 +54,12 @@ def load_and_process_docs(uploaded_file, website_url, openrouter_api_key):
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     split_docs = text_splitter.split_documents(all_docs)
+    return split_docs
 
-
-    # --- Create Chroma vectorstore locally ---
-    persist_directory = "chroma_db"  # Directory to store the Chroma DB
-
-    # Delete existing Chroma DB directory if it exists
-    if os.path.exists(persist_directory):
-        shutil.rmtree(persist_directory)
-
-    embedding = OpenAIEmbeddings(openai_api_key=openrouter_api_key,
-                                 openai_api_base="https://openrouter.ai/api/v1") #Use openrouter_api_key
-    vectorstore = Chroma.from_documents(
-        documents=split_docs,
-        embedding=embedding,
-        persist_directory=persist_directory,
-    )
-    vectorstore.persist()
-
-    return vectorstore
 
 
 # Function to generate podcast conversation
-def generate_podcast(topic, vectorstore, llm):  # Changed context_docs to vectorstore
+def generate_podcast(topic, context_docs, llm):
     podcast_template = ChatPromptTemplate.from_template("""
         Create an engaging conversation between two speakers discussing the topic: {topic}
 
@@ -103,20 +83,22 @@ def generate_podcast(topic, vectorstore, llm):  # Changed context_docs to vector
     """)
 
 
-    if vectorstore:
-         retriever = vectorstore.as_retriever()
-
-         chain = create_retrieval_chain(
-            retriever,
-            create_stuff_documents_chain(llm, podcast_template)
+    if context_docs:
+        retriever = create_retrieval_chain(
+            {
+                "context": lambda x: x["docs"],
+                "topic": lambda x: x["topic"],
+            },
+            (RunnablePassthrough.assign(docs=lambda x: x["docs"]) | create_stuff_documents_chain(llm,podcast_template)),
         )
-         conversation = chain.invoke({"input": topic})
 
-
+        response = retriever.invoke({"docs": context_docs,"topic": topic})
+        conversation = response
     else:
         chain = podcast_template | llm | StrOutputParser()
         conversation = chain.invoke({"topic": topic, "context": ""})
     return conversation
+
 
 
 # Function to generate audio
@@ -141,19 +123,19 @@ def generate_audio(conversation, fal_api_key):
                 }
             ]
         },
-        api_key=fal_api_key,
+         api_key=fal_api_key,
         with_logs=True,
         on_queue_update=on_queue_update,
     )
     return result.get("audio", {}).get("url")
 
 
+
 # Streamlit App
 st.title("Podcast Generator")
 st.write("❤️ Built by [Build Fast with AI](https://buildfastwithai.com/genai-course)")
 
-
-# Sidebar for API Keys
+# Sidebar for API Keys and Inputs
 with st.sidebar:
     st.header("API Keys")
     openrouter_api_key = st.text_input("OpenRouter API Key", type="password")
@@ -175,7 +157,7 @@ with tab1:
         else:
             with st.spinner("Generating..."):
                 llm = initialize_llm(openrouter_api_key)
-                conversation = generate_podcast(topic, None, llm) #Pass None
+                conversation = generate_podcast(topic, None, llm)
                 if conversation:
                     st.subheader("Generated Conversation:")
                     st.write(conversation)
@@ -192,8 +174,9 @@ with tab1:
 # Tab 2: Generate from Document
 with tab2:
     st.header("Generate Podcast from Document")
-    uploaded_file = st.file_uploader("Upload a PDF Document", type=["pdf"])
     topic = st.text_input("Enter a topic for the podcast:")  # Add topic input
+    uploaded_file = st.file_uploader("Upload a PDF Document", type=["pdf"])
+
     if st.button("Generate Podcast from Document"):
         if not openrouter_api_key or not fal_api_key:
             st.error("Please enter both API Keys in the sidebar.")
@@ -204,9 +187,9 @@ with tab2:
         else:
             with st.spinner("Generating..."):
                 llm = initialize_llm(openrouter_api_key)
-                vectorstore = load_and_process_docs(uploaded_file, None, openrouter_api_key)  # Pass None for website URL
-                if vectorstore:
-                    conversation = generate_podcast(topic, vectorstore, llm) #Pass Vectorstore
+                context_docs = load_and_process_docs(uploaded_file, None)  # Pass None for website URL
+                if context_docs:
+                    conversation = generate_podcast(topic, context_docs, llm)
                     if conversation:
                         st.subheader("Generated Conversation:")
                         st.write(conversation)
@@ -225,8 +208,9 @@ with tab2:
 # Tab 3: Generate from URL
 with tab3:
     st.header("Generate Podcast from URL")
-    website_url = st.text_input("Enter a Website URL")
     topic = st.text_input("Enter a topic for the podcast:")  # Add topic input
+    website_url = st.text_input("Enter a Website URL")
+
     if st.button("Generate Podcast from URL"):
         if not openrouter_api_key or not fal_api_key:
             st.error("Please enter both API Keys in the sidebar.")
@@ -237,9 +221,9 @@ with tab3:
         else:
             with st.spinner("Generating..."):
                 llm = initialize_llm(openrouter_api_key)
-                vectorstore = load_and_process_docs(None, website_url, openrouter_api_key)  # Pass None for uploaded file
-                if vectorstore:
-                    conversation = generate_podcast(topic, vectorstore, llm) #Pass Vectorstore
+                context_docs = load_and_process_docs(None, website_url)  # Pass None for uploaded file
+                if context_docs:
+                    conversation = generate_podcast(topic, context_docs, llm)
                     if conversation:
                         st.subheader("Generated Conversation:")
                         st.write(conversation)
