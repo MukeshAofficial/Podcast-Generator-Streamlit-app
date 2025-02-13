@@ -148,16 +148,16 @@ tab1, tab2, tab3 = st.tabs(["Generate with Topic", "Generate from Document", "Ge
 # Tab 1: Generate with Topic
 with tab1:
     st.header("Generate Podcast from Topic")
-    topic = st.text_input("Enter a topic for the podcast:")
+    topic1 = st.text_input("Enter a topic for the podcast:", key="topic1") # Unique Key
     if st.button("Generate Podcast with Topic"):
         if not openrouter_api_key or not fal_api_key:
             st.error("Please enter both API Keys in the sidebar.")
-        elif not topic:
+        elif not topic1:
             st.error("Please enter a topic.")
         else:
             with st.spinner("Generating..."):
                 llm = initialize_llm(openrouter_api_key)
-                conversation = generate_podcast(topic, None, llm)
+                conversation = generate_podcast(topic1, None, llm)
                 if conversation:
                     st.subheader("Generated Conversation:")
                     st.write(conversation)
@@ -174,7 +174,7 @@ with tab1:
 # Tab 2: Generate from Document
 with tab2:
     st.header("Generate Podcast from Document")
-    topic = st.text_input("Enter a topic for the podcast:")  # Add topic input
+    topic2 = st.text_input("Enter a topic for the podcast:", key="topic2")  # Unique Key
     uploaded_file = st.file_uploader("Upload a PDF Document", type=["pdf"])
 
     if st.button("Generate Podcast from Document"):
@@ -182,14 +182,14 @@ with tab2:
             st.error("Please enter both API Keys in the sidebar.")
         elif not uploaded_file:
             st.error("Please upload a PDF document.")
-        elif not topic:
+        elif not topic2:
              st.error("Please enter a topic")
         else:
             with st.spinner("Generating..."):
                 llm = initialize_llm(openrouter_api_key)
                 context_docs = load_and_process_docs(uploaded_file, None)  # Pass None for website URL
                 if context_docs:
-                    conversation = generate_podcast(topic, context_docs, llm)
+                    conversation = generate_podcast(topic2, context_docs, llm)
                     if conversation:
                         st.subheader("Generated Conversation:")
                         st.write(conversation)
@@ -208,7 +208,7 @@ with tab2:
 # Tab 3: Generate from URL
 with tab3:
     st.header("Generate Podcast from URL")
-    topic = st.text_input("Enter a topic for the podcast:")  # Add topic input
+    topic3 = st.text_input("Enter a topic for the podcast:", key="topic3")  # Unique Key
     website_url = st.text_input("Enter a Website URL")
 
     if st.button("Generate Podcast from URL"):
@@ -216,14 +216,14 @@ with tab3:
             st.error("Please enter both API Keys in the sidebar.")
         elif not website_url:
             st.error("Please enter a Website URL.")
-        elif not topic:
+        elif not topic3:
              st.error("Please enter a topic")
         else:
             with st.spinner("Generating..."):
                 llm = initialize_llm(openrouter_api_key)
                 context_docs = load_and_process_docs(None, website_url)  # Pass None for uploaded file
                 if context_docs:
-                    conversation = generate_podcast(topic, context_docs, llm)
+                    conversation = generate_podcast(topic3, context_docs, llm)
                     if conversation:
                         st.subheader("Generated Conversation:")
                         st.write(conversation)
