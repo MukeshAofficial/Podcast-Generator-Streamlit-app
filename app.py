@@ -1,4 +1,3 @@
-%%writefile app.py
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
