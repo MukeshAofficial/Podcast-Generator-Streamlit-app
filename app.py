@@ -13,7 +13,6 @@ import requests
 import os
 import tempfile
 from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_chroma import Chroma
 import shutil  # Import shutil for deleting directories
 
 
