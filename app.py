@@ -1,3 +1,4 @@
+%%writefile app.py
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -12,7 +13,6 @@ import fal_client
 import requests
 import os
 import tempfile
-
 
 
 # Initialize LLM with API Keys directly
@@ -58,7 +58,6 @@ def load_and_process_docs(uploaded_file, website_url):
     return split_docs
 
 
-
 # Function to generate podcast conversation
 def generate_podcast(topic, context_docs, llm):
     podcast_template = ChatPromptTemplate.from_template("""
@@ -83,23 +82,21 @@ def generate_podcast(topic, context_docs, llm):
 
     """)
 
-
     if context_docs:
         retriever = create_retrieval_chain(
             {
                 "context": lambda x: x["docs"],
                 "topic": lambda x: x["topic"],
             },
-            (RunnablePassthrough.assign(docs=lambda x: x["docs"]) | create_stuff_documents_chain(llm,podcast_template)),
+            (RunnablePassthrough.assign(docs=lambda x: x["docs"]) | create_stuff_documents_chain(llm, podcast_template)),
         )
 
-        response = retriever.invoke({"docs": context_docs,"topic": topic})
+        response = retriever.invoke({"docs": context_docs, "topic": topic})
         conversation = response
     else:
         chain = podcast_template | llm | StrOutputParser()
         conversation = chain.invoke({"topic": topic, "context": ""})
     return conversation
-
 
 
 # Function to generate audio
@@ -124,12 +121,11 @@ def generate_audio(conversation, fal_api_key):
                 }
             ]
         },
-         api_key=fal_api_key,
+        api_key=fal_api_key,
         with_logs=True,
         on_queue_update=on_queue_update,
     )
     return result.get("audio", {}).get("url")
-
 
 
 # Streamlit App
@@ -137,27 +133,29 @@ st.title("Podcast Generator")
 st.write("❤️ Built by [Build Fast with AI](https://buildfastwithai.com/genai-course)")
 
 
-# Sidebar for API Keys and Inputs
+# Sidebar for API Keys
 with st.sidebar:
     st.header("API Keys")
     openrouter_api_key = st.text_input("OpenRouter API Key", type="password")
     fal_api_key = st.text_input("FAL API Key", type="password")
-    st.header("Podcast Inputs")
+
+
+# Tab structure
+tab1, tab2, tab3 = st.tabs(["Generate with Topic", "Generate from Document", "Generate from URL"])
+
+# Tab 1: Generate with Topic
+with tab1:
+    st.header("Generate Podcast from Topic")
     topic = st.text_input("Enter a topic for the podcast:")
-    uploaded_file = st.file_uploader("Upload a PDF Document", type=["pdf"])
-    website_url = st.text_input("Enter a Website URL")
-
-
-
-if st.button("Generate Podcast"):
-    with st.spinner("Generating..."):
+    if st.button("Generate Podcast with Topic"):
         if not openrouter_api_key or not fal_api_key:
             st.error("Please enter both API Keys in the sidebar.")
+        elif not topic:
+            st.error("Please enter a topic.")
         else:
-            llm = initialize_llm(openrouter_api_key)
-            context_docs = load_and_process_docs(uploaded_file, website_url)
-            if topic:
-                conversation = generate_podcast(topic, context_docs, llm)
+            with st.spinner("Generating..."):
+                llm = initialize_llm(openrouter_api_key)
+                conversation = generate_podcast(topic, None, llm)
                 if conversation:
                     st.subheader("Generated Conversation:")
                     st.write(conversation)
@@ -169,5 +167,69 @@ if st.button("Generate Podcast"):
                         st.error("Failed to generate audio.")
                 else:
                     st.error("Failed to generate conversation.")
-            else:
-                  st.error("Please enter a topic.")
+
+
+# Tab 2: Generate from Document
+with tab2:
+    st.header("Generate Podcast from Document")
+    uploaded_file = st.file_uploader("Upload a PDF Document", type=["pdf"])
+    topic = st.text_input("Enter a topic for the podcast:")  # Add topic input
+    if st.button("Generate Podcast from Document"):
+        if not openrouter_api_key or not fal_api_key:
+            st.error("Please enter both API Keys in the sidebar.")
+        elif not uploaded_file:
+            st.error("Please upload a PDF document.")
+        elif not topic:
+             st.error("Please enter a topic")
+        else:
+            with st.spinner("Generating..."):
+                llm = initialize_llm(openrouter_api_key)
+                context_docs = load_and_process_docs(uploaded_file, None)  # Pass None for website URL
+                if context_docs:
+                    conversation = generate_podcast(topic, context_docs, llm)
+                    if conversation:
+                        st.subheader("Generated Conversation:")
+                        st.write(conversation)
+                        audio_url = generate_audio(conversation, fal_api_key)
+                        if audio_url:
+                            st.subheader("Listen to the Podcast:")
+                            st.audio(audio_url)
+                        else:
+                            st.error("Failed to generate audio.")
+                    else:
+                        st.error("Failed to generate conversation.")
+                else:
+                    st.error("Failed to process the document.")
+
+
+# Tab 3: Generate from URL
+with tab3:
+    st.header("Generate Podcast from URL")
+    website_url = st.text_input("Enter a Website URL")
+    topic = st.text_input("Enter a topic for the podcast:")  # Add topic input
+    if st.button("Generate Podcast from URL"):
+        if not openrouter_api_key or not fal_api_key:
+            st.error("Please enter both API Keys in the sidebar.")
+        elif not website_url:
+            st.error("Please enter a Website URL.")
+        elif not topic:
+             st.error("Please enter a topic")
+        else:
+            with st.spinner("Generating..."):
+                llm = initialize_llm(openrouter_api_key)
+                context_docs = load_and_process_docs(None, website_url)  # Pass None for uploaded file
+                if context_docs:
+                    conversation = generate_podcast(topic, context_docs, llm)
+                    if conversation:
+                        st.subheader("Generated Conversation:")
+                        st.write(conversation)
+                        audio_url = generate_audio(conversation, fal_api_key)
+                        if audio_url:
+                            st.subheader("Listen to the Podcast:")
+                            st.audio(audio_url)
+                        else:
+                            st.error("Failed to generate audio.")
+                    else:
+                        st.error("Failed to generate conversation.")
+                else:
+                    st.error("Failed to fetch data from the website.")
