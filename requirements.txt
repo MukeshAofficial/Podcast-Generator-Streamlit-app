@@ -3,9 +3,12 @@ fal-client
 langchain-openai
 langchain-google-genai
 langchain_openai
+langchain
 fal_client
 langchain-community
+langchain_community
 langchain_chroma
+langchain-chroma
 pypdf
 python-docx
 chromadb
