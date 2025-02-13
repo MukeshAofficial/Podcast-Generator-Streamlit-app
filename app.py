@@ -121,7 +121,7 @@ def generate_podcast_transcript(topic, text=None, openai_api_key=None):
 
 
 # --- Function for Generating Podcast with Audio ---
-def generate_podcast(topic, text=None, openai_api_key=None):
+def generate_podcast(topic, text=None, openai_api_key=None, fal_key=None):
     if text:
         st.write(f"\n🎙️ Generating podcast transcript about text provided:")
         st.write("-" * 50)
@@ -168,6 +168,7 @@ def generate_podcast(topic, text=None, openai_api_key=None):
                         },
                     ],
                 },
+                api_key = fal_key,
                 with_logs=True,
                 on_queue_update=on_queue_update,
             )
@@ -195,12 +196,7 @@ def main():
 
     # API Key Input
     openai_api_key = st.sidebar.text_input("Enter your OpenRouter API Key:", type="password")
-    fal_key = os.getenv("FAL_KEY")
-    if not fal_key:
-         st.sidebar.warning("Please set FAL_KEY environment variable.")
-         return
-
-    os.environ["FAL_KEY"] = fal_key
+    fal_key = st.sidebar.text_input("Enter your FAL API Key:", type="password")
 
     # --- Sidebar for Navigation ---
     st.sidebar.title("Navigation")
@@ -215,7 +211,10 @@ def main():
                 if not openai_api_key:
                      st.warning("Please enter your OpenRouter API key in the sidebar.")
                      return
-                podcast_data = generate_podcast(topic, openai_api_key=openai_api_key)
+                if not fal_key:
+                    st.warning("Please enter your FAL API key in the sidebar.")
+                    return
+                podcast_data = generate_podcast(topic, openai_api_key=openai_api_key, fal_key=fal_key)
 
                 if podcast_data and podcast_data["audio_url"]:
                    st.audio(podcast_data["audio_url"], format="audio/mpeg")
@@ -233,11 +232,15 @@ def main():
                 if not openai_api_key:
                      st.warning("Please enter your OpenRouter API key in the sidebar.")
                      return
+                if not fal_key:
+                    st.warning("Please enter your FAL API key in the sidebar.")
+                    return
+
                 loader = WebBaseLoader(url)
                 data = loader.load()
                 text = data[0].page_content
                 with st.spinner('Scraping URL Content...'):
-                    podcast_data = generate_podcast(podcast_title, text, openai_api_key=openai_api_key)
+                    podcast_data = generate_podcast(podcast_title, text, openai_api_key=openai_api_key, fal_key = fal_key)
                 if podcast_data and podcast_data["audio_url"]:
                    st.audio(podcast_data["audio_url"], format="audio/mpeg")
 
@@ -255,6 +258,9 @@ def main():
               try:
                 if not openai_api_key:
                     st.warning("Please enter your OpenRouter API key in the sidebar.")
+                    return
+                if not fal_key:
+                    st.warning("Please enter your FAL API key in the sidebar.")
                     return
                 with st.spinner('Loading and processing document...'):
                   # Create a temporary file
@@ -277,7 +283,7 @@ def main():
                     
                     # Process all the text chunks
                     podcast_text = " ".join(chunks)
-                    podcast_data = generate_podcast(podcast_title, podcast_text, openai_api_key=openai_api_key)
+                    podcast_data = generate_podcast(podcast_title, podcast_text, openai_api_key=openai_api_key, fal_key = fal_key)
                     
                     # Delete the temporary file
                     os.remove(temp_file_path)
